@@ -43,7 +43,7 @@ pip install pandas numpy
 1. **Clone Repositori**:
 
    ```bash
-   git clone https://github.com/username/repo-name.git
+   git clone https://github.com/PTPOJIC/Tanah-dataset-generator-.git
    ```
 
 2. **Jalankan Script**:
@@ -52,7 +52,7 @@ pip install pandas numpy
 
    ```bash
    cd repo-name
-   python soil_suitability_with_soil_voltage.py
+   python Tdg.py
    ```
 
 3. **Hasil**:
