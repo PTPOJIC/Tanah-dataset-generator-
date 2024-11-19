@@ -10,7 +10,9 @@ import os
 
 
 # Define constants
-MODEL_PATH = "earth_fix_ai_model.pkl"
+MODEL_PATH = "GradientBoosting_model.pkl"
+MODEL_PATH = "LinearRegression_model.pkl"
+MODEL_PATH = "RandomForest_model.pkl"
 DATASET_PATH = "soil_suitability_with_soil_voltage.csv"
 
 
