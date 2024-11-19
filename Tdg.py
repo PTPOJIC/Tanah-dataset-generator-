@@ -47,13 +47,13 @@ def generate_soil_voltage(soil_types):
     voltages = []
     for soil_type in soil_types:
         if soil_type == 'Lempung':
-            voltages.append(np.random.uniform(200, 500))  # Voltase untuk tanah lempung
+            voltages.append(np.random.uniform(200, 500))  # Voltage range for clay soil
         elif soil_type == 'Pasir':
-            voltages.append(np.random.uniform(50, 150))  # Voltase untuk tanah pasir
+            voltages.append(np.random.uniform(50, 150))  # Voltage range for sandy soil
         elif soil_type == 'Gambut':
-            voltages.append(np.random.uniform(300, 800))  # Voltase untuk tanah gambut
+            voltages.append(np.random.uniform(300, 800))  # Voltage range for peat soil
         elif soil_type == 'Liat':
-            voltages.append(np.random.uniform(100, 300))  # Voltase untuk tanah liat
+            voltages.append(np.random.uniform(100, 300))  # Voltage range for loamy soil
     return np.array(voltages)
 
 def calculate_suitability(nutrient_data, soil_data, environmental_data):
@@ -105,7 +105,7 @@ def generate_farm_soil_suitability_dataset(n_rows=10000000, output_file='soil_su
     # Combine all data into one dictionary
     data = {**nutrient_data, **soil_data, **environmental_data,
             "Soil_Type": soil_types,
-            "Soil_Voltage_mV": voltages,  # Voltase tanah berdasarkan jenis tanah
+            "Soil_Voltage_mV": voltages,  # Soil voltage based on soil type
             "Suitability_Score_Perc": suitability_score}
     
     # Creating DataFrame
@@ -122,3 +122,4 @@ def generate_farm_soil_suitability_dataset(n_rows=10000000, output_file='soil_su
 if __name__ == "__main__":
     # Adjust the number of rows or output file name if necessary
     generate_farm_soil_suitability_dataset(n_rows=100, output_file='soil_suitability_with_soil_voltage.csv')
+    
