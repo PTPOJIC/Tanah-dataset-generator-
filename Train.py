@@ -1,91 +1,153 @@
 import pandas as pd
 import numpy as np
-from sklearn.model_selection import train_test_split
-from sklearn.ensemble import GradientBoostingRegressor
-from sklearn.ensemble import GradientBoostingClassifier
-from sklearn.metrics import mean_squared_error, r2_score, accuracy_score
-from sklearn.preprocessing import StandardScaler
+from sklearn.ensemble import GradientBoostingRegressor, RandomForestRegressor
+from sklearn.linear_model import LinearRegression
+from sklearn.model_selection import train_test_split, GridSearchCV
 from sklearn.pipeline import Pipeline
 from sklearn.compose import ColumnTransformer
-from sklearn.model_selection import cross_val_predict
+from sklearn.preprocessing import StandardScaler, OneHotEncoder
+from sklearn.metrics import mean_absolute_error, mean_squared_error, r2_score
+import joblib
+import os
 
-def create_derived_features(df):
+# Function to load the dataset
+def load_dataset(file_path):
     """
-    Add derived features for enhanced modeling.
-    """
-    df['N_to_P_Ratio'] = df['Nitrogen_Content_Perc'] / (df['Phosphorus_Content_ppm'] + 1e-6)
-    df['Moisture_pH_Interaction'] = df['Soil_pH'] * df['Soil_Moisture_Perc']
-    return df
-
-def train_soil_suitability_model(dataset_path, model_output_path='soil_suitability_model.pkl'):
-    """
-    Train a complex AI model to predict soil suitability with probabilistic results.
-    """
-    # Load dataset
-    data = pd.read_csv(dataset_path)
+    Load dataset from the given file path.
     
-    # Preprocessing: Convert categorical data to numerical (e.g., Drainage_Analysis, Soil_Type)
-    data = pd.get_dummies(data, columns=["Drainage_Analysis", "Soil_Type"], drop_first=True)
-    
-    # Add derived features
-    data = create_derived_features(data)
-    
-    # Define features and target
-    X = data.drop(columns=["Suitability_Score_Perc"])
-    y_regression = data["Suitability_Score_Perc"]  # Regression target
-    y_classification = pd.cut(
-        y_regression, bins=[-np.inf, 33, 66, np.inf], labels=["Low", "Medium", "High"]
-    )  # Classification target
+    Args:
+        file_path (str): Path to the CSV file.
+        
+    Returns:
+        pd.DataFrame: Loaded dataset as a pandas DataFrame.
+    """
+    if not os.path.exists(file_path):
+        raise FileNotFoundError(f"Dataset file not found: {file_path}")
+    return pd.read_csv(file_path)
 
-    # Split into training and testing sets
-    X_train, X_test, y_train_reg, y_test_reg = train_test_split(X, y_regression, test_size=0.2, random_state=42)
-    _, _, y_train_cls, y_test_cls = train_test_split(X, y_classification, test_size=0.2, random_state=42)
-
-    # Create a pipeline with scaling
+# Preprocessing and splitting the dataset
+def preprocess_data(df, target_column):
+    """
+    Preprocess the dataset for training the model.
+    
+    Args:
+        df (pd.DataFrame): The dataset.
+        target_column (str): The column name of the target variable.
+        
+    Returns:
+        tuple: Preprocessed features, target, and the feature names.
+    """
+    # Separate features and target
+    X = df.drop(columns=[target_column], errors='ignore')
+    y = df[target_column]
+    
+    # Identify numeric and categorical columns
     numeric_features = X.select_dtypes(include=['float64', 'int64']).columns
-    numeric_transformer = Pipeline(steps=[('scaler', StandardScaler())])
-
+    categorical_features = X.select_dtypes(include=['object']).columns
+    
+    # Preprocessing pipelines for numeric and categorical features
+    numeric_transformer = Pipeline(steps=[
+        ('scaler', StandardScaler())
+    ])
+    
+    categorical_transformer = Pipeline(steps=[
+        ('onehot', OneHotEncoder(handle_unknown='ignore'))
+    ])
+    
+    # Combine preprocessors
     preprocessor = ColumnTransformer(
         transformers=[
-            ('num', numeric_transformer, numeric_features)
-        ]
-    )
+            ('num', numeric_transformer, numeric_features),
+            ('cat', categorical_transformer, categorical_features)
+        ])
+    
+    return X, y, preprocessor
 
-    # Regression model
-    reg_model = Pipeline(steps=[
-        ('preprocessor', preprocessor),
-        ('regressor', GradientBoostingRegressor(n_estimators=200, random_state=42))
-    ])
-    reg_model.fit(X_train, y_train_reg)
+# Train and evaluate models
+def train_and_evaluate(X, y, preprocessor, models, test_size=0.2, random_state=42):
+    """
+    Train and evaluate multiple models.
+    
+    Args:
+        X (pd.DataFrame): Feature dataset.
+        y (pd.Series): Target variable.
+        preprocessor (ColumnTransformer): Preprocessing pipeline.
+        models (dict): Dictionary of models to train.
+        test_size (float): Proportion of the dataset to include in the test split.
+        random_state (int): Random state for reproducibility.
+        
+    Returns:
+        dict: Evaluation metrics for each model.
+    """
+    # Split dataset
+    X_train, X_test, y_train, y_test = train_test_split(X, y, test_size=test_size, random_state=random_state)
+    
+    results = {}
+    
+    for name, model in models.items():
+        # Create a pipeline
+        pipeline = Pipeline(steps=[
+            ('preprocessor', preprocessor),
+            ('model', model)
+        ])
+        
+        # Train the model
+        pipeline.fit(X_train, y_train)
+        
+        # Predict on the test set
+        y_pred = pipeline.predict(X_test)
+        
+        # Evaluate the model
+        mae = mean_absolute_error(y_test, y_pred)
+        mse = mean_squared_error(y_test, y_pred)
+        r2 = r2_score(y_test, y_pred)
+        
+        # Save the pipeline
+        model_file = f"{name}_model.pkl"
+        joblib.dump(pipeline, model_file)
+        print(f"Model '{name}' saved as '{model_file}'.")
+        
+        # Store results
+        results[name] = {
+            'MAE': mae,
+            'MSE': mse,
+            'R2 Score': r2,
+            'Model File': model_file
+        }
+    
+    return results
 
-    # Classification model
-    cls_model = Pipeline(steps=[
-        ('preprocessor', preprocessor),
-        ('classifier', GradientBoostingClassifier(n_estimators=200, random_state=42))
-    ])
-    cls_model.fit(X_train, y_train_cls)
-
-    # Evaluate regression model
-    y_pred_reg = reg_model.predict(X_test)
-    reg_mse = mean_squared_error(y_test_reg, y_pred_reg)
-    reg_r2 = r2_score(y_test_reg, y_pred_reg)
-    print(f"Regression Model Evaluation:\n- MSE: {reg_mse:.2f}\n- R²: {reg_r2:.2f}")
-
-    # Evaluate classification model
-    y_pred_cls = cls_model.predict(X_test)
-    cls_accuracy = accuracy_score(y_test_cls, y_pred_cls)
-    print(f"Classification Model Evaluation:\n- Accuracy: {cls_accuracy:.2f}")
-
-    # Save the models
-    import joblib
-    joblib.dump(reg_model, model_output_path.replace('.pkl', '_reg.pkl'))
-    joblib.dump(cls_model, model_output_path.replace('.pkl', '_cls.pkl'))
-    print(f"Models saved to '{model_output_path.replace('.pkl', '_reg.pkl')}' and '{model_output_path.replace('.pkl', '_cls.pkl')}'.")
-
+# Main script
 if __name__ == "__main__":
-    # Path to the generated dataset
+    # Path to the dataset
     dataset_path = 'soil_suitability_with_soil_voltage.csv'
-
-    # Train the model using the dataset
-    train_soil_suitability_model(dataset_path)
+    
+    # Load the dataset
+    print("Loading dataset...")
+    df = load_dataset(dataset_path)
+    
+    # Target column
+    target = 'Suitability_Score_Perc'
+    
+    # Preprocess the data
+    print("Preprocessing dataset...")
+    X, y, preprocessor = preprocess_data(df, target)
+    
+    # Define models to train
+    model_dict = {
+        'GradientBoosting': GradientBoostingRegressor(),
+        'RandomForest': RandomForestRegressor(),
+        'LinearRegression': LinearRegression()
+    }
+    
+    # Train and evaluate models
+    print("Training and evaluating models...")
+    results = train_and_evaluate(X, y, preprocessor, model_dict)
+    
+    # Display results
+    print("\nModel Evaluation Results:")
+    for model_name, metrics in results.items():
+        print(f"\nModel: {model_name}")
+        for metric, value in metrics.items():
+            print(f"  {metric}: {value}")
     
