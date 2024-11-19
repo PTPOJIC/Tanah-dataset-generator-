@@ -121,4 +121,4 @@ def generate_farm_soil_suitability_dataset(n_rows=10000000, output_file='soil_su
 
 if __name__ == "__main__":
     # Adjust the number of rows or output file name if necessary
-    generate_farm_soil_suitability_dataset(n_rows=10000000, output_file='soil_suitability_with_soil_voltage.csv')
+    generate_farm_soil_suitability_dataset(n_rows=100, output_file='soil_suitability_with_soil_voltage.csv')
